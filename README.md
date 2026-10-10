@@ -1,14 +1,14 @@
 # JARVIS — personal assistant for macOS
 
-Milestone 1 is a local React + TypeScript dashboard connected to a Python FastAPI backend. It uses deterministic mock responses and requires **no API keys**. No microphone access, computer actions, external AI calls, or persistent memory are implemented.
+Milestone 1 is a local React + TypeScript command center connected to a Python FastAPI backend. It uses deterministic mock responses and requires **no API keys**. No microphone access, computer actions, external AI calls, or persistent memory are implemented.
 
 ## Milestone 1 checklist
 
-- [x] React + TypeScript + Vite dashboard with responsive futuristic styling
+- [x] React + TypeScript + Vite interface with responsive holographic styling
 - [x] Backend health and assistant status, displayed from live API responses
-- [x] Chat panel connected to a mock-response endpoint
-- [x] Serbian/English selector (main chat copy and mock responses; some dashboard labels remain English)
-- [x] Microphone placeholder, system cards, session command history
+- [x] On-demand conversation window connected to a mock-response endpoint
+- [x] Serbian/English selector, local UI commands, and mock responses
+- [x] Disabled microphone control, real connection status, session command history
 - [x] Environment configuration, JSON request logging, backend and frontend tests
 - [x] Modular service boundary and macOS installation instructions
 - [ ] Validate natively on macOS (cloud development host is Linux)
@@ -22,9 +22,10 @@ backend/
   requirements.txt
 frontend/
   src/
-    components/    # shell, SVG core, command console, conversations, telemetry
-    hooks/         # session/API state, navigation, visibility
+    components/    # SVG core, HUD panels, command console, holographic windows
+    hooks/         # session/API state, window management, visibility
     styles/        # core motion and rendering styles
+    commands.ts    # deterministic English/Serbian UI intent parser
     api.ts         # existing typed API client
     copy.ts        # English/Serbian interface copy
   package-lock.json
@@ -32,23 +33,33 @@ frontend/
 
 The assistant service is the future integration point for model providers. Add speech, memory, and computer automation as separate services; automation will need explicit user approval before executing actions. Milestone 1 does not expose an action execution endpoint.
 
-## Cinematic command center
+## Minimal holographic command center
 
-![JARVIS command center captured from the running application in Chromium](docs/command-center.png)
+![Minimal JARVIS home captured from the running application](docs/minimal-home.png)
 
-The interface uses the supplied SVG reference as visual inspiration, with original SVG geometry and local fonts (Space Grotesk and JetBrains Mono). It makes no external font or model requests.
+The permanent centerpiece is a large animated SVG intelligence core with segmented rings, orbital paths, radial ticks, geometric structures, and 180 procedural particles. Four compact HUD panels show local time/date, messaging availability, email availability, and real backend/provider status. The browser uses your Mac’s local timezone. Messages and email show **Not connected** without fabricated content or unread counts.
 
-- **Command center:** holographic core, compact conversation channel, and recent command history.
-- **AI core:** a larger inspection view. Segmented orbits, radial ticks, particles, the intelligence sphere, and an elliptical orbit are rendered live with SVG and CSS.
-- **Conversations:** expanded session messages with timestamps, safe fenced-code rendering, and command history. Messages survive navigation and clear on page reload.
-- **System settings:** session motion controls and a manual backend health check. The top-bar language selector controls navigation, primary chat copy, and mock response language; some technical labels remain English.
-- **Tasks, agents, memory, tools, workflows:** informative Coming Soon views. They do not run actions or enable future capabilities.
+There is no permanent sidebar or chat window. Use the text console to summon modules:
 
-The core reflects real connection/request states: connecting, idle, processing, responding after a received reply, offline, and request error. A listening visual state exists only for future integration; nothing activates it or requests microphone access. The Talk control opens an explanatory notice.
+| English | Serbian | Result |
+| --- | --- | --- |
+| Jarvis, bring up my task list. | Jarvise, prikaži zadatke. | Open Task Manager |
+| Jarvis, show my calendar. | Jarvise, otvori kalendar. | Open Calendar |
+| Jarvis, display my emails. | Jarvise, prikaži mejlove. | Expand email window |
+| Jarvis, show my conversations. | Jarvise, prikaži razgovore. | Show session chat and command history |
+| Jarvis, open settings. | Jarvise, otvori podešavanja. | Open settings |
+| Jarvis, close the task list. | Jarvise, zatvori zadatke. | Close Task Manager |
+| Jarvis, close all windows. | Jarvise, zatvori sve prozore. | Restore minimal home |
 
-Use **Command-K** (Control-K also works) to focus the command input, and **Enter** to send. Navigation supports URL hashes and browser back/forward. At smaller widths the telemetry column collapses; on phones use the menu button to open navigation, and Escape to close it. The command console remains accessible while scrolling.
+Known UI commands use a deterministic allowlist locally, including while the backend is offline. Unknown text uses the existing mock assistant endpoint; commands never execute JavaScript, shell commands, or computer actions. Serbian Cyrillic is also supported. Future speech-to-text can feed this same validated router; voice recognition is not implemented and the microphone button is disabled.
 
-Animations respect `prefers-reduced-motion`, can be paused in settings, and pause automatically when the tab is hidden. Health polling also pauses in hidden tabs and resumes on return. Request timestamps and activity come from actual session events; there are no simulated CPU/RAM statistics. The neural particle field is a procedural visual, not live AI model telemetry.
+Windows support focus, close, minimize/restore, multiple open modules, and desktop dragging/resizing within the visible stage. Focus the title or resize handle and use arrow keys (Shift for larger steps) as keyboard alternatives. Smaller screens stack windows below the core. Opening and closing use approximately 320 ms holographic assembly transitions. A compact top menu also summons windows, and settings provide motion and integration-preview privacy controls. Integration previews default to private; no authenticated integration data is available yet.
+
+![On-demand windows leave the JARVIS core visible](docs/on-demand-windows.png)
+
+Conversations retain the existing session messages, safe code rendering, timestamps, and command history until page reload. A backend reply briefly appears above the console; open Conversations to review it afterward. Tasks, calendar, email, messages, agents, memory, tools, and workflows are honest availability views: no storage, integrations, or automation have been added.
+
+The core reflects idle, processing, responding, and error/offline states. A separate listening visual state is reserved for future integration. **Command-K** (Control-K also works) focuses the command input; **Enter** submits. Animations respect reduced-motion preferences, can be disabled in settings, and pause with health polling when the tab is hidden. The particle field is decorative geometry, not live model telemetry. Fonts are bundled locally.
 
 ## Run on your Mac
 
@@ -80,7 +91,7 @@ cd frontend
 npm run dev
 ```
 
-Once the servers are running on your Mac, open `http://localhost:5173`. The backend API documentation is at `http://127.0.0.1:8000/docs`. Stop each server with Control-C. The UI checks backend health every 10 seconds; if offline, chat sending is disabled. A failed chat request is reported in the UI and command history.
+Once the servers are running on your Mac, open `http://localhost:5173`. The backend API documentation is at `http://127.0.0.1:8000/docs`. Stop each server with Control-C. The UI checks backend health every 10 seconds; if offline, backend chat is disabled while local window commands remain available. A failed chat request is reported in the UI and command history.
 
 ## Configuration
 
@@ -119,6 +130,6 @@ The API requests require the backend to be running. Test installation with `npm 
 
 ### Redesign validation
 
-Frontend tests cover the existing chat, language, offline, and failure behavior, plus module navigation, retained conversations, core request states, manual recovery, keyboard input focus, session motion controls, and safe code rendering. Backend endpoint tests are unchanged.
+Frontend tests cover the minimal default layout, hidden modules, English/Serbian command routing, window state and keyboard controls, retained chat/history, language, offline and failure behavior, request states, manual recovery, motion controls, and safe code rendering. Backend endpoint tests remain unchanged.
 
-The redesign was also checked in Chromium at 1440×900, 1280×800, 1920×1080, 1024×768, 800×800, and 390×844: no horizontal overflow; desktop core and command console remain visible. Browser checks exercised live English/Serbian API chat, module navigation, processing/responding/idle states, request errors, offline recovery, hidden-tab animation pause, and reduced motion. Native macOS/Safari testing remains outstanding.
+Validation passed: **36 frontend tests**, **7 backend tests**, TypeScript checks, and the production build. Chromium checks at 1440×900, 1280×800, 1920×1080, 1024×768, 800×800, and 390×844 found no horizontal overflow. Browser checks exercised local commands without backend requests, real English/Serbian mock chat, window dragging/clamping, resizing, minimize/restore, close-all, mobile stacking, the local timezone clock, reduced motion, and opening windows with motion disabled. Native macOS/Safari testing remains outstanding.

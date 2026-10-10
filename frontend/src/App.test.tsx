@@ -19,7 +19,6 @@ const status = {
   capabilities: { chat: true, voice: false, memory: false, automation: false },
 };
 beforeEach(() => {
-  window.history.replaceState(null, "", "/");
   vi.mocked(getStatus).mockResolvedValue(status);
   vi.mocked(sendMessage).mockResolvedValue({
     reply: "Mock reply",
@@ -33,85 +32,113 @@ afterEach(() => {
   vi.unstubAllGlobals();
   delete (document as unknown as { hidden?: boolean }).hidden;
 });
-describe("dashboard", () => {
-  it("shows real status and sends a chat request", async () => {
+function command(text: string, label = "Send message") {
+  fireEvent.change(screen.getByLabelText("Message"), {
+    target: { value: text },
+  });
+  fireEvent.click(screen.getByLabelText(label));
+}
+
+describe("minimal holographic home", () => {
+  it("shows only the core, clock, integration placeholders and connection until summoned", async () => {
     render(<App />);
     await screen.findByText("Online");
-    fireEvent.change(screen.getByLabelText("Message"), {
-      target: { value: "Hello" },
-    });
-    fireEvent.click(screen.getByLabelText("Send message"));
+    expect(
+      screen.getByRole("img", { name: /holographic core/ }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("region", { name: "Local clock" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("region", { name: "Recent messages" }),
+    ).toHaveTextContent("Not connected");
+    expect(
+      screen.getByRole("region", { name: "Recent emails" }),
+    ).toHaveTextContent("Not connected");
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.queryByRole("log")).not.toBeInTheDocument();
+    expect(screen.queryByRole("navigation")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("region", { name: "Command history" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Microphone — coming soon")).toBeDisabled();
+  });
+  it("routes English and Serbian window commands without API calls and closes all windows", async () => {
+    render(<App />);
+    await screen.findByText("Online");
+    command("Jarvis, bring up my task list.");
+    expect(
+      screen.getByRole("dialog", { name: "Task manager" }),
+    ).toBeInTheDocument();
+    command("Jarvise, otvori kalendar.");
+    expect(
+      screen.getByRole("dialog", { name: "Calendar" }),
+    ).toBeInTheDocument();
+    command("Jarvise, zatvori sve prozore.");
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(sendMessage).not.toHaveBeenCalled();
+  });
+  it("handles UI commands while offline without pretending chat is available", async () => {
+    vi.mocked(getStatus).mockRejectedValue(new Error("offline"));
+    render(<App />);
+    await screen.findByText("Offline");
+    command("Hello");
+    expect(screen.getByLabelText("Send message")).toBeDisabled();
+    command("open settings");
+    expect(
+      screen.getByRole("dialog", { name: "Settings" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent("Backend unavailable");
+    expect(sendMessage).not.toHaveBeenCalled();
+  });
+  it("sends unknown input to chat and retains conversation and command history", async () => {
+    render(<App />);
+    await screen.findByText("Online");
+    command("Hello");
     await screen.findByText("Mock reply");
     expect(sendMessage).toHaveBeenCalledWith("Hello", "en");
+    command("show conversations");
+    const conversation = screen.getByRole("dialog", { name: "Conversations" });
+    expect(within(conversation).getByText("Mock reply")).toBeInTheDocument();
     expect(
-      screen.getByText("Mock response ·", { exact: false }),
-    ).toBeInTheDocument();
+      within(conversation).getByRole("region", { name: "Command history" }),
+    ).toHaveTextContent("Mock response");
+    command("close conversations");
+    command("open conversations");
+    expect(screen.getByText("Mock reply")).toBeInTheDocument();
   });
-  it("switches Serbian language and keeps microphone a placeholder", async () => {
+  it("switches Serbian language for chat and local windows, never enabling microphone access", async () => {
     render(<App />);
     await screen.findByText("Online");
     fireEvent.change(screen.getByLabelText("Language"), {
       target: { value: "sr" },
     });
-    expect(screen.getByText("Na vašoj usluzi.")).toBeInTheDocument();
-    fireEvent.click(screen.getByLabelText("Microphone — coming soon"));
+    expect(screen.getByLabelText("Microphone — coming soon")).toBeDisabled();
     expect(
       screen.getByText(/Pristup mikrofonu nije zatražen/),
     ).toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText("Message"), {
-      target: { value: "Zdravo" },
-    });
-    fireEvent.click(screen.getByLabelText("Pošalji poruku"));
+    command("Zdravo", "Pošalji poruku");
     await waitFor(() =>
       expect(sendMessage).toHaveBeenCalledWith("Zdravo", "sr"),
     );
-  });
-  it("shows an offline error and disables sending", async () => {
-    vi.mocked(getStatus).mockRejectedValue(new Error("offline"));
-    render(<App />);
-    await screen.findByText("Offline");
-    expect(screen.getByRole("alert")).toHaveTextContent("Backend unavailable");
-    fireEvent.change(screen.getByLabelText("Message"), {
-      target: { value: "Hello" },
-    });
-    expect(screen.getByLabelText("Send message")).toBeDisabled();
+    command("Jarvise, prikaži zadatke.", "Pošalji poruku");
+    expect(screen.getByRole("dialog", { name: "Zadaci" })).toBeInTheDocument();
   });
   it("records failed requests without a fake success", async () => {
     vi.mocked(sendMessage).mockRejectedValue(new Error("failed"));
     render(<App />);
     await screen.findByText("Online");
-    fireEvent.change(screen.getByLabelText("Message"), {
-      target: { value: "Hello" },
-    });
-    fireEvent.click(screen.getByLabelText("Send message"));
-    await within(
-      screen.getByRole("region", { name: "Command history" }),
-    ).findByText(/Request failed/);
-    expect(screen.getByRole("alert")).toBeInTheDocument();
-  });
-});
-
-describe("cinematic command center", () => {
-  it("keeps messages across navigation and explains future modules", async () => {
-    render(<App />);
-    await screen.findByText("Online");
-    fireEvent.change(screen.getByLabelText("Message"), {
-      target: { value: "Keep this conversation" },
-    });
-    fireEvent.click(screen.getByLabelText("Send message"));
-    await screen.findByText("Mock reply");
-    fireEvent.click(screen.getByRole("link", { name: /Memory/ }));
+    command("Hello");
+    await screen.findByRole("alert");
+    command("show conversations");
     expect(
-      screen.getByText(/Persistent storage is not connected/),
-    ).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("link", { name: /Conversations/ }));
-    expect(screen.getByText("Mock reply")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /Conversations/ })).toHaveAttribute(
-      "aria-current",
-      "page",
-    );
+      screen.getByRole("region", { name: "Command history" }),
+    ).toHaveTextContent("Request failed");
+    expect(
+      screen.getByRole("img", { name: /holographic core/ }),
+    ).toHaveAttribute("data-state", "error");
   });
-  it("reacts to pending and completed requests without accepting duplicate submissions", async () => {
+  it("reacts to pending and completed requests without duplicate submissions", async () => {
     let resolve!: (value: { reply: string; mode: string }) => void;
     vi.mocked(sendMessage).mockImplementation(
       () =>
@@ -121,10 +148,7 @@ describe("cinematic command center", () => {
     );
     render(<App />);
     await screen.findByText("Online");
-    fireEvent.change(screen.getByLabelText("Message"), {
-      target: { value: "Analyze this" },
-    });
-    fireEvent.click(screen.getByLabelText("Send message"));
+    command("Analyze this");
     expect(
       screen.getByRole("img", { name: /holographic core/ }),
     ).toHaveAttribute("data-state", "processing");
@@ -137,7 +161,34 @@ describe("cinematic command center", () => {
       screen.getByRole("img", { name: /holographic core/ }),
     ).toHaveAttribute("data-state", "responding");
   });
-  it("supports manual connection recovery and a working keyboard shortcut", async () => {
+  it("minimizes/restores, focuses windows and supports keyboard moving and resizing", async () => {
+    render(<App />);
+    await screen.findByText("Online");
+    command("open calendar");
+    const dialog = screen.getByRole("dialog", { name: "Calendar" });
+    expect(dialog).toHaveFocus();
+    const left = Number.parseFloat(dialog.style.left);
+    fireEvent.keyDown(
+      screen.getByLabelText("Move Calendar window (arrow keys)"),
+      { key: "ArrowRight" },
+    );
+    expect(Number.parseFloat(dialog.style.left)).toBe(left + 20);
+    const width = Number.parseFloat(dialog.style.width);
+    fireEvent.keyDown(
+      screen.getByLabelText("Resize Calendar window (arrow keys)"),
+      { key: "ArrowRight" },
+    );
+    expect(Number.parseFloat(dialog.style.width)).toBe(width + 20);
+    fireEvent.click(screen.getByLabelText("Minimize Calendar"));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Message")).toHaveFocus();
+    fireEvent.click(screen.getByLabelText("Restore Calendar"));
+    expect(screen.getByRole("dialog", { name: "Calendar" })).toHaveFocus();
+    fireEvent.click(screen.getByLabelText("Close Calendar"));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Message")).toHaveFocus();
+  });
+  it("supports manual connection recovery and keyboard input focus", async () => {
     vi.mocked(getStatus)
       .mockRejectedValueOnce(new Error("offline"))
       .mockResolvedValue(status);
@@ -149,24 +200,22 @@ describe("cinematic command center", () => {
     fireEvent.keyDown(window, { key: "k", metaKey: true });
     expect(screen.getByLabelText("Message")).toHaveFocus();
   });
-  it("lets the user pause motion in settings", async () => {
+  it("provides session motion and private-preview controls in summoned settings", async () => {
     const { container } = render(<App />);
     await screen.findByText("Online");
-    fireEvent.click(screen.getByRole("link", { name: /System settings/ }));
+    fireEvent.click(screen.getByLabelText("Open settings"));
+    expect(
+      screen.getByLabelText(/Keep integration previews private/),
+    ).toBeChecked();
     fireEvent.click(screen.getByLabelText("Interface motion"));
     expect(container.querySelector(".jarvis-shell")).toHaveAttribute(
       "data-motion",
       "paused",
     );
-    expect(screen.getByLabelText("Interface motion")).toHaveAttribute(
-      "aria-pressed",
-      "false",
-    );
   });
 });
-
 describe("motion and background lifecycle", () => {
-  it("honors reduced motion even when the session motion toggle is enabled", async () => {
+  it("honors reduced motion even with motion enabled", async () => {
     vi.stubGlobal(
       "matchMedia",
       vi.fn(() => ({
@@ -177,11 +226,7 @@ describe("motion and background lifecycle", () => {
     );
     const { container } = render(<App />);
     await screen.findByText("Online");
-    expect(container.querySelector(".jarvis-shell")).toHaveAttribute(
-      "data-motion",
-      "paused",
-    );
-    fireEvent.click(screen.getByRole("link", { name: /System settings/ }));
+    fireEvent.click(screen.getByLabelText("Open settings"));
     fireEvent.click(screen.getByLabelText("Interface motion"));
     fireEvent.click(screen.getByLabelText("Interface motion"));
     expect(screen.getByLabelText("Interface motion")).toHaveAttribute(
@@ -193,7 +238,6 @@ describe("motion and background lifecycle", () => {
       "paused",
     );
   });
-
   it("pauses health polling in hidden tabs and refreshes on return", async () => {
     vi.useFakeTimers();
     const { container } = render(<App />);

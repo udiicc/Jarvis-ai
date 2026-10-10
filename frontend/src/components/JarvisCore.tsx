@@ -13,9 +13,9 @@ const ticks = Array.from({ length: 120 }, (_, index) => {
   };
 });
 // Deterministic geometry: no random render values, timers, or animation re-renders.
-const particles = Array.from({ length: 110 }, (_, index) => {
+const particles = Array.from({ length: 180 }, (_, index) => {
   const angle = index * 2.399963229728653;
-  const radius = 112 * Math.sqrt((index + 0.5) / 110);
+  const radius = 112 * Math.sqrt((index + 0.5) / 180);
   return {
     x: 300 + Math.cos(angle) * radius,
     y: 300 + Math.sin(angle) * radius,

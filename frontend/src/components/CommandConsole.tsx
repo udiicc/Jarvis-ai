@@ -17,8 +17,7 @@ export default function CommandConsole({
   connection,
   state,
   text,
-  voiceNotice,
-  toggleVoice,
+  canSend,
 }: {
   draft: string;
   setDraft: (value: string) => void;
@@ -27,8 +26,7 @@ export default function CommandConsole({
   connection: Connection;
   state: CoreState;
   text: Copy;
-  voiceNotice: boolean;
-  toggleVoice: () => void;
+  canSend: boolean;
 }) {
   const input = useRef<HTMLInputElement>(null);
   useEffect(() => {
@@ -57,6 +55,9 @@ export default function CommandConsole({
           {text.noActions}
         </span>
       </div>
+      <span id="voice-unavailable" className="sr-only">
+        {text.voice}
+      </span>
       <form
         onSubmit={(event) => {
           event.preventDefault();
@@ -65,12 +66,12 @@ export default function CommandConsole({
         className="command-form"
       >
         <button
-          className={`talk-control ${voiceNotice ? "show-notice" : ""}`}
+          className="talk-control"
           type="button"
           aria-label="Microphone — coming soon"
-          aria-expanded={voiceNotice}
-          aria-controls="voice-notice"
-          onClick={toggleVoice}
+          disabled
+          title={text.voice}
+          aria-describedby="voice-unavailable"
         >
           <span className="talk-icon">
             <Mic size={20} strokeWidth={1.5} />
@@ -83,6 +84,7 @@ export default function CommandConsole({
         <div className="command-input-group">
           <span className="command-prompt">›</span>
           <input
+            id="command-input"
             ref={input}
             aria-label="Message"
             placeholder={text.placeholder}
@@ -96,7 +98,7 @@ export default function CommandConsole({
             className="command-send"
             type="submit"
             aria-label={text.send}
-            disabled={!draft.trim() || sending || connection !== "online"}
+            disabled={!draft.trim() || sending || !canSend}
           >
             <Send size={16} />
             <span>{sending ? "…" : <CornerDownLeft size={12} />}</span>

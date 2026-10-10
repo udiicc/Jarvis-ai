@@ -1,24 +1,46 @@
 import { useEffect, useState } from "react";
+import { ArrowUpRight, Layers3, Settings2, X } from "lucide-react";
 import type { Language } from "./api";
 import { copy } from "./copy";
+import {
+  parseUICommand,
+  windowTitles,
+  windowTitlesSr,
+  type WindowId,
+} from "./commands";
 import { useJarvis } from "./hooks/useJarvis";
-import { useNavigation } from "./hooks/useNavigation";
 import { useVisibility } from "./hooks/useVisibility";
-import JarvisShell from "./components/JarvisShell";
-import CommandCenter from "./components/CommandCenter";
+import { useStageBounds } from "./hooks/useStageBounds";
+import { useWindows } from "./hooks/useWindows";
+import JarvisCore from "./components/JarvisCore";
+import HomeHud from "./components/HomeHud";
 import CommandConsole from "./components/CommandConsole";
-import { ComingSoon, SettingsView } from "./components/ModuleView";
+import HolographicWindow from "./components/HolographicWindow";
+import WindowContents from "./components/WindowContents";
 
 export default function App() {
   const [language, setLanguage] = useState<Language>("en");
   const [draft, setDraft] = useState("");
-  const [voiceNotice, setVoiceNotice] = useState(false);
   const [motion, setMotion] = useState(true);
+  const [privacy, setPrivacy] = useState(true);
   const [systemReducedMotion, setSystemReducedMotion] = useState(false);
+  const [menu, setMenu] = useState(false);
+  const [feedback, setFeedback] = useState("");
+  const [replyId, setReplyId] = useState<number | null>(null);
   const visible = useVisibility();
   const session = useJarvis(language, visible);
-  const { module, navigate } = useNavigation();
-  const text = copy[language];
+  const { ref, bounds } = useStageBounds();
+  const reducedMotion = !motion || systemReducedMotion;
+  const manager = useWindows(bounds, reducedMotion);
+  const text = copy[language],
+    titles = language === "sr" ? windowTitlesSr : windowTitles;
+  const compact = bounds.width < 900;
+  const liveWindows = manager.windows.filter((item) => !item.minimized);
+  const focusedLayer = Math.max(
+    0,
+    ...liveWindows.filter((item) => !item.closing).map((item) => item.layer),
+  );
+  const reply = session.messages.find((message) => message.id === replyId);
   useEffect(() => {
     document.documentElement.lang = language;
   }, [language]);
@@ -30,86 +52,216 @@ export default function App() {
     media.addEventListener("change", update);
     return () => media.removeEventListener("change", update);
   }, []);
-  const submit = () => {
-    if (!draft.trim() || session.sending || session.connection !== "online")
-      return;
-    const message = draft;
-    setDraft("");
-    void session.submit(message);
+  useEffect(() => {
+    const last = session.messages.at(-1);
+    if (last?.role !== "assistant") return;
+    setReplyId(last.id);
+    const timer = setTimeout(() => setReplyId(null), 15000);
+    return () => clearTimeout(timer);
+  }, [session.messages]);
+  useEffect(() => {
+    if (!feedback) return;
+    const timer = setTimeout(() => setFeedback(""), 5000);
+    return () => clearTimeout(timer);
+  }, [feedback]);
+  useEffect(() => {
+    const escape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setMenu(false);
+    };
+    window.addEventListener("keydown", escape);
+    return () => window.removeEventListener("keydown", escape);
+  }, []);
+  const open = (id: WindowId) => {
+    manager.open(id);
+    setMenu(false);
+    setReplyId(null);
   };
+  const submit = () => {
+    const command = draft.trim();
+    if (!command || session.sending) return;
+    const intent = parseUICommand(command);
+    if (intent) {
+      manager.run(intent);
+      setDraft("");
+      setReplyId(null);
+      setFeedback(
+        intent.action === "close-all"
+          ? language === "sr"
+            ? "Svi prozori su zatvoreni."
+            : "All windows closed."
+          : `${titles[intent.window]} · ${intent.action}`,
+      );
+      return;
+    }
+    if (session.connection !== "online") return;
+    setDraft("");
+    setFeedback("");
+    void session.submit(command);
+  };
+  const canSend = !!parseUICommand(draft) || session.connection === "online";
   return (
-    <JarvisShell
-      module={module}
-      navigate={navigate}
-      session={session}
-      text={text}
-      language={language}
-      setLanguage={setLanguage}
-      paused={!visible || !motion || systemReducedMotion}
-      console={
-        <>
-          <div className="console-notices">
-            {session.connection === "offline" && (
-              <div className="system-notice error" role="alert">
-                <span>CONNECTION /</span>
-                {text.offline}
-              </div>
-            )}
-            {session.error && session.connection !== "offline" && (
-              <div className="system-notice error" role="alert">
-                <span>REQUEST /</span>
-                {text.chatError}
-              </div>
-            )}
-            {voiceNotice && (
-              <div id="voice-notice" className="system-notice" role="status">
-                <span>VOICE /</span>
-                {text.voice}
+    <div
+      className="minimal-shell jarvis-shell"
+      data-motion={!visible || reducedMotion ? "paused" : "active"}
+      data-reduced-motion={reducedMotion}
+    >
+      <header className="minimal-topbar">
+        <span className="minimal-brand">
+          J<span> / </span>PERSONAL INTELLIGENCE
+        </span>
+        <div className="minimal-top-controls">
+          <select
+            aria-label="Language"
+            value={language}
+            onChange={(event) => setLanguage(event.target.value as Language)}
+          >
+            <option value="en">English</option>
+            <option value="sr">Srpski</option>
+          </select>
+          <button
+            className="subtle-control"
+            aria-label="Open settings"
+            title="Settings"
+            onClick={() => open("settings")}
+          >
+            <Settings2 size={16} />
+          </button>
+          <div className="summon-menu-anchor">
+            <button
+              className="subtle-control"
+              aria-label="Summon a window"
+              aria-expanded={menu}
+              onClick={() => setMenu(!menu)}
+            >
+              <Layers3 size={16} />
+            </button>
+            {menu && (
+              <div className="summon-menu" aria-label="Available windows">
+                {(Object.keys(windowTitles) as WindowId[]).map((id) => (
+                  <button key={id} onClick={() => open(id)}>
+                    {titles[id]}
+                  </button>
+                ))}
                 <button
-                  onClick={() => setVoiceNotice(false)}
-                  aria-label="Dismiss voice notice"
+                  onClick={() => {
+                    manager.closeAll();
+                    setMenu(false);
+                  }}
                 >
-                  ×
+                  {language === "sr"
+                    ? "Zatvori sve prozore"
+                    : "Close all windows"}
                 </button>
               </div>
             )}
           </div>
-          <CommandConsole
-            draft={draft}
-            setDraft={setDraft}
-            submit={submit}
-            sending={session.sending}
-            connection={session.connection}
-            state={session.coreState}
-            text={text}
-            voiceNotice={voiceNotice}
-            toggleVoice={() => setVoiceNotice(!voiceNotice)}
-          />
-        </>
-      }
-    >
-      {module === "command" ||
-      module === "core" ||
-      module === "conversations" ? (
-        <CommandCenter
+        </div>
+      </header>
+      <main
+        className={`home-stage ${liveWindows.length ? "has-windows" : ""} ${compact ? "compact-stage" : ""}`}
+        ref={ref}
+        aria-label="Holographic home"
+      >
+        <div className="home-core-stage">
+          <JarvisCore state={session.coreState} />
+        </div>
+        <HomeHud
           session={session}
-          text={text}
           language={language}
-          module={module}
-          navigate={navigate}
-          reducedMotion={!motion || systemReducedMotion}
+          visible={visible}
+          privacy={privacy}
+          open={open}
         />
-      ) : module === "settings" ? (
-        <SettingsView
+        <div className="window-layer">
+          {liveWindows.map((item) => (
+            <HolographicWindow
+              key={item.id}
+              window={item}
+              title={titles[item.id]}
+              manager={manager}
+              active={item.layer === focusedLayer}
+              compact={compact}
+            >
+              <WindowContents
+                id={item.id}
+                session={session}
+                language={language}
+                motion={motion}
+                setMotion={setMotion}
+                privacy={privacy}
+                setPrivacy={setPrivacy}
+                reducedMotion={reducedMotion}
+              />
+            </HolographicWindow>
+          ))}
+        </div>
+      </main>
+      <div className="home-command-area">
+        {manager.windows.some((item) => item.minimized) && (
+          <div className="window-dock" aria-label="Minimized windows">
+            {manager.windows
+              .filter((item) => item.minimized && !item.closing)
+              .map((item) => (
+                <button
+                  key={item.id}
+                  aria-label={`Restore ${titles[item.id]}`}
+                  onClick={() => manager.open(item.id)}
+                >
+                  {titles[item.id]}
+                  <ArrowUpRight size={11} />
+                </button>
+              ))}
+          </div>
+        )}
+        <div className="command-feedback" aria-live="polite">
+          {feedback}
+        </div>
+        {reply &&
+          !manager.windows.some(
+            (item) =>
+              item.id === "conversations" && !item.minimized && !item.closing,
+          ) && (
+            <div className="assistant-reply" role="status">
+              <strong>JARVIS</strong>
+              <p>{reply.text}</p>
+              <button
+                onClick={() => open("conversations")}
+                aria-label="Show conversation"
+              >
+                <ArrowUpRight size={13} />
+              </button>
+              <button
+                onClick={() => setReplyId(null)}
+                aria-label="Dismiss reply"
+              >
+                <X size={12} />
+              </button>
+            </div>
+          )}
+        {session.connection === "offline" && (
+          <div className="minimal-error" role="alert">
+            {text.offline}{" "}
+            {language === "sr"
+              ? "Lokalne UI komande i dalje rade."
+              : "Local window commands still work."}
+          </div>
+        )}
+        {session.error && session.connection !== "offline" && (
+          <div className="minimal-error" role="alert">
+            {text.chatError}
+          </div>
+        )}
+        <CommandConsole
+          draft={draft}
+          setDraft={setDraft}
+          submit={submit}
+          sending={session.sending}
+          connection={session.connection}
+          state={session.coreState}
           text={text}
-          motion={motion}
-          setMotion={setMotion}
-          session={session}
-          navigate={navigate}
+          canSend={canSend}
         />
-      ) : (
-        <ComingSoon module={module} text={text} navigate={navigate} />
-      )}
-    </JarvisShell>
+      </div>
+    </div>
   );
 }
