@@ -1,3 +1,4 @@
+import asyncio
 from typing import Literal
 
 from fastapi import APIRouter, Request
@@ -17,6 +18,7 @@ class ContextMessage(BaseModel):
 class ChatRequest(BaseModel):
     message: str = Field(min_length=1, max_length=2000)
     language: Literal["en", "sr"] = "en"
+    source: Literal["text", "voice"] = "text"
     history: list[ContextMessage] = Field(default_factory=list, max_length=12)
 
     @field_validator("message")
@@ -46,15 +48,30 @@ async def assistant_status(request: Request):
         "model": assistant.settings.ollama_model if assistant.mode == "ollama" else assistant.settings.model if assistant.mode == "openai" else None,
         "provider_state": assistant.provider_state, "provider_error": assistant.error_code,
         "languages": ["en", "sr"],
-        "capabilities": {"chat": True, "voice": False, "memory": False, "automation": False},
+        "capabilities": {"chat": True, "voice": request.app.state.voice.stt_ready(), "memory": False, "automation": False},
     }
 
 
 @router.post("/chat", response_model=ChatResponse)
 async def chat(payload: ChatRequest, request: Request):
     assistant = request.app.state.assistant
+    if payload.source == "voice" and assistant.mode != "ollama":
+        return JSONResponse(status_code=409, content={"detail": "Voice conversations require AI_PROVIDER=ollama. No paid provider was called.", "code": "voice_provider"})
+    if request.app.state.voice.busy or (payload.source == "voice" and assistant.busy):
+        return JSONResponse(status_code=409, content={"detail": "Local audio processing is busy.", "code": "busy"})
     try:
-        reply = await assistant.reply(payload.message, payload.language, payload.history)
+        task = asyncio.create_task(assistant.reply(payload.message, payload.language, payload.history))
+        if payload.source == "voice":
+            request.app.state.voice.chat_task = task
+        try:
+            reply = await task
+        except asyncio.CancelledError:
+            assistant.provider_state = "ready"
+            assistant.error_code = None
+            return JSONResponse(status_code=499, content={"detail": "Voice request cancelled.", "code": "voice_cancelled"})
+        finally:
+            if request.app.state.voice.chat_task is task:
+                request.app.state.voice.chat_task = None
         return ChatResponse(reply=reply, mode=assistant.mode)
     except AssistantError as error:
         if error.code not in {"busy", "usage_limit"}:

@@ -7,6 +7,7 @@ import {
   Radio,
   RefreshCw,
 } from "lucide-react";
+import type { CoreState } from "../types";
 import type { Language } from "../api";
 import type { JarvisSession } from "../hooks/useJarvis";
 import type { WindowId } from "../commands";
@@ -59,7 +60,7 @@ export default function HomeHud({
   privacy,
   open,
 }: {
-  session: JarvisSession;
+  session: Omit<JarvisSession, "coreState"> & { coreState: CoreState };
   language: Language;
   visible: boolean;
   privacy: boolean;

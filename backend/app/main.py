@@ -9,6 +9,7 @@ from .config import Settings
 from .assistant import Assistant
 from .logging_config import configure_logging
 from .routes import router
+from .voice import VoiceService, router as voice_router
 
 
 def create_app():
@@ -23,10 +24,12 @@ def create_app():
         try:
             yield
         finally:
+            await app.state.voice.cancel()
             await app.state.assistant.close()
 
     app = FastAPI(title="JARVIS", version="0.1.0", lifespan=lifespan)
     app.state.assistant = Assistant(settings)
+    app.state.voice = VoiceService()
     app.add_middleware(
         CORSMiddleware, allow_origins=list(settings.allowed_origins),
         allow_methods=["GET", "POST"], allow_headers=["Content-Type"],
@@ -42,6 +45,7 @@ def create_app():
         return response
 
     app.include_router(router)
+    app.include_router(voice_router)
     return app
 
 

@@ -1134,3 +1134,27 @@
 .minimal-shell[data-reduced-motion="true"] .window-light-sweep {
   animation: none !important;
 }
+
+.voice-feedback {
+  position: absolute;
+  bottom: 112px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(90%, 720px);
+  background: #04101a;
+  border: 1px solid #154c60;
+  padding: 8px 14px;
+  font-size: 12px;
+  z-index: 90;
+  max-height: 130px;
+  overflow: auto;
+}
+.voice-feedback p {
+  margin: 4px 0;
+}
+.jarvis-core[data-state="transcribing"] .orbit-outer {
+  animation-duration: 12s;
+}
+.jarvis-core[data-state="speaking"] .intelligence-sphere {
+  animation-duration: 2s;
+}

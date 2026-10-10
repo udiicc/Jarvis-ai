@@ -88,7 +88,7 @@ export function useJarvis(language: Language, visible: boolean) {
     return () => clearInterval(timer);
   }, [visible, refresh]);
 
-  const submit = async (raw: string) => {
+  const submit = async (raw: string, voiceSignal?: AbortSignal) => {
     const message = raw.trim();
     if (
       !message ||
@@ -117,7 +117,14 @@ export function useJarvis(language: Language, visible: boolean) {
     );
     addEvent("request", "Text command submitted");
     try {
-      const response = await sendMessage(message, language, context.current);
+      const response = await sendMessage(
+        message,
+        language,
+        context.current,
+        ...(voiceSignal
+          ? [{ source: "voice" as const, signal: voiceSignal }]
+          : []),
+      );
       context.current = [
         ...context.current,
         { role: "user", content: message },
@@ -151,8 +158,18 @@ export function useJarvis(language: Language, visible: boolean) {
       responseTimer.current = setTimeout(() => {
         if (mounted.current) setResponding(false);
       }, 2200);
+      return response.reply;
     } catch (failure) {
       if (!mounted.current) return true;
+      if (voiceSignal?.aborted) {
+        setHistory((current) =>
+          current.map((item) =>
+            item.id === messageId ? { ...item, result: "failed" } : item,
+          ),
+        );
+        addEvent("request", "Voice request cancelled");
+        return false;
+      }
       setErrorMessage(failure instanceof Error ? failure.message : null);
       void refresh();
       setError(true);
@@ -166,7 +183,7 @@ export function useJarvis(language: Language, visible: boolean) {
       requestInFlight.current = false;
       if (mounted.current) setSending(false);
     }
-    return true;
+    return false;
   };
   const coreState: CoreState =
     connection === "offline"

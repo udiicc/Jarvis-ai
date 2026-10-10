@@ -24,6 +24,8 @@ const particles = Array.from({ length: 180 }, (_, index) => {
   };
 });
 const labels: Record<CoreState, string> = {
+  transcribing: "TRANSCRIBING",
+  speaking: "SPEAKING",
   idle: "SYSTEM ONLINE · IDLE",
   processing: "PROCESSING",
   responding: "RESPONDING",

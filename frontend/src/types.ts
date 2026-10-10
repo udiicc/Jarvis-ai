@@ -1,5 +1,7 @@
 export type Connection = "connecting" | "online" | "offline";
 export type CoreState =
+  | "transcribing"
+  | "speaking"
   | "idle"
   | "processing"
   | "responding"

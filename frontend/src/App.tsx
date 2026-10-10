@@ -1,3 +1,4 @@
+import { useVoice } from "./hooks/useVoice";
 import { useEffect, useState } from "react";
 import { ArrowUpRight, Layers3, Settings2, X } from "lucide-react";
 import type { Language } from "./api";
@@ -76,9 +77,9 @@ export default function App() {
     setMenu(false);
     setReplyId(null);
   };
-  const submit = () => {
-    const command = draft.trim();
-    if (!command || session.sending) return;
+  const execute = async (raw: string, signal?: AbortSignal) => {
+    const command = raw.trim();
+    if (!command || session.sending) return null;
     const intent = parseUICommand(command);
     if (intent) {
       manager.run(intent);
@@ -91,12 +92,38 @@ export default function App() {
             : "All windows closed."
           : `${titles[intent.window]} · ${intent.action}`,
       );
-      return;
+      return null;
     }
-    if (session.connection !== "online") return;
+    if (signal && session.status?.mode !== "ollama")
+      throw new Error(
+        "Voice conversations require Ollama. No paid provider was called.",
+      );
+    if (session.connection !== "online") throw new Error("Backend is offline.");
     setDraft("");
     setFeedback("");
-    void session.submit(command);
+    const answer = await session.submit(command, signal);
+    if (!answer && signal)
+      throw new Error(
+        "Voice conversation failed. See the assistant error message.",
+      );
+    return typeof answer === "string" ? answer : null;
+  };
+  const voice = useVoice(language, execute);
+  const voiceActive = !["idle", "error"].includes(voice.state);
+  const coreState =
+    voice.state === "error"
+      ? "error"
+      : voice.state === "listening"
+        ? "listening"
+        : voice.state === "transcribing"
+          ? "transcribing"
+          : voice.state === "thinking"
+            ? "processing"
+            : voice.state === "speaking"
+              ? "speaking"
+              : session.coreState;
+  const submit = () => {
+    void execute(draft).catch(() => {});
   };
   const canSend = !!parseUICommand(draft) || session.connection === "online";
   return (
@@ -163,10 +190,10 @@ export default function App() {
         aria-label="Holographic home"
       >
         <div className="home-core-stage">
-          <JarvisCore state={session.coreState} mode={session.status?.mode} />
+          <JarvisCore state={coreState} mode={session.status?.mode} />
         </div>
         <HomeHud
-          session={session}
+          session={{ ...session, coreState }}
           language={language}
           visible={visible}
           privacy={privacy}
@@ -251,14 +278,41 @@ export default function App() {
             {session.errorMessage || text.chatError}
           </div>
         )}
+        {(voice.transcript || voice.error || voice.notice) && (
+          <div className="voice-feedback" aria-live="polite">
+            {voice.transcript && (
+              <p>
+                {" "}
+                {language === "sr" ? "Prepoznato" : "Transcription"}:{" "}
+                {voice.transcript}
+              </p>
+            )}
+            {voice.error && <p role="alert">{voice.error}</p>}
+            {voice.playbackReady && (
+              <button
+                type="button"
+                className="subtle-control"
+                onClick={() => void voice.resume()}
+              >
+                Play reply
+              </button>
+            )}
+            {voice.notice && <p>{voice.notice}</p>}
+          </div>
+        )}
         <CommandConsole
           draft={draft}
           setDraft={setDraft}
           submit={submit}
-          sending={session.sending}
+          sending={session.sending || voiceActive}
           connection={session.connection}
-          state={session.coreState}
+          state={coreState}
           text={text}
+          voiceState={voice.state}
+          onVoice={() =>
+            voice.state === "listening" ? voice.stop() : voice.start()
+          }
+          cancelVoice={voice.cancel}
           canSend={canSend}
         />
       </div>

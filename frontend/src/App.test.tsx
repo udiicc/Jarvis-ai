@@ -61,7 +61,7 @@ describe("minimal holographic home", () => {
     expect(
       screen.queryByRole("region", { name: "Command history" }),
     ).not.toBeInTheDocument();
-    expect(screen.getByLabelText("Microphone — coming soon")).toBeDisabled();
+    expect(screen.getByLabelText("Start recording")).toBeEnabled();
   });
   it("routes English and Serbian window commands without API calls and closes all windows", async () => {
     render(<App />);
@@ -113,9 +113,9 @@ describe("minimal holographic home", () => {
     fireEvent.change(screen.getByLabelText("Language"), {
       target: { value: "sr" },
     });
-    expect(screen.getByLabelText("Microphone — coming soon")).toBeDisabled();
+    expect(screen.getByLabelText("Start recording")).toBeEnabled();
     expect(
-      screen.getByText(/Pristup mikrofonu nije zatražen/),
+      screen.getByText(/Click to record; click again/),
     ).toBeInTheDocument();
     command("Zdravo", "Pošalji poruku");
     await waitFor(() =>
@@ -369,4 +369,80 @@ it("displays Ollama model availability and preserves free local commands", async
   });
   fireEvent.click(screen.getByLabelText("Refresh backend status"));
   await screen.findByText("Model missing");
+});
+
+it("routes microphone transcription through the existing Serbian command router with reduced motion", async () => {
+  let recorder!: {
+    state: string;
+    ondataavailable?: (e: { data: Blob }) => void;
+    onstop?: () => void;
+  };
+  vi.stubGlobal(
+    "MediaRecorder",
+    class {
+      static isTypeSupported = () => true;
+      state = "inactive";
+      mimeType = "audio/webm";
+      constructor() {
+        recorder = this;
+      }
+      ondataavailable?: (e: { data: Blob }) => void;
+      onstop?: () => void;
+      start() {
+        this.state = "recording";
+      }
+      stop() {
+        this.state = "inactive";
+        this.ondataavailable?.({ data: new Blob(["audio"]) });
+        this.onstop?.();
+      }
+    },
+  );
+  const media = vi
+    .fn()
+    .mockResolvedValue({ getTracks: () => [{ stop: vi.fn() }] });
+  Object.defineProperty(navigator, "mediaDevices", {
+    configurable: true,
+    value: { getUserMedia: media },
+  });
+  Object.defineProperty(window, "isSecureContext", {
+    configurable: true,
+    value: true,
+  });
+  vi.stubGlobal(
+    "fetch",
+    vi
+      .fn()
+      .mockResolvedValue({
+        ok: true,
+        json: async () => ({ text: "Jarvise, otvori zadatke." }),
+      }),
+  );
+  vi.stubGlobal(
+    "matchMedia",
+    vi
+      .fn()
+      .mockReturnValue({
+        matches: true,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      }),
+  );
+  render(<App />);
+  await screen.findByText("Online");
+  expect(media).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByLabelText("Start recording"));
+  await screen.findByLabelText("Stop recording");
+  expect(screen.getByRole("img", { name: /holographic core/ })).toHaveAttribute(
+    "data-state",
+    "listening",
+  );
+  fireEvent.click(screen.getByLabelText("Stop recording"));
+  await screen.findByRole("dialog", { name: "Task manager" });
+  expect(sendMessage).not.toHaveBeenCalled();
+  expect(screen.getByText(/Transcription: Jarvise/)).toBeInTheDocument();
+  expect(document.querySelector(".minimal-shell")).toHaveAttribute(
+    "data-reduced-motion",
+    "true",
+  );
 });

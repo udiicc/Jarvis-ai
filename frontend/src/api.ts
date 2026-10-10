@@ -34,7 +34,9 @@ async function request<T>(
   try {
     response = await fetch(`${base}${path}`, {
       ...options,
-      signal: AbortSignal.timeout(timeout),
+      signal: options?.signal
+        ? AbortSignal.any([options.signal, AbortSignal.timeout(timeout)])
+        : AbortSignal.timeout(timeout),
     });
   } catch {
     throw new Error(
@@ -45,6 +47,8 @@ async function request<T>(
     // Only render the backend's allowlisted error text; never raw provider responses.
     const body = await response.json().catch(() => null);
     const codes = [
+      "voice_provider",
+      "voice_cancelled",
       "missing_key",
       "ollama_offline",
       "ollama_model",
@@ -79,13 +83,20 @@ export const sendMessage = (
   message: string,
   language: Language,
   history: ContextMessage[] = [],
+  options?: { source: "voice"; signal: AbortSignal },
 ) =>
   request<{ reply: string; mode: string }>(
     "/api/chat",
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message, language, history }),
+      body: JSON.stringify({
+        message,
+        language,
+        history,
+        ...(options ? { source: options.source } : {}),
+      }),
+      ...(options ? { signal: options.signal } : {}),
     },
     310000,
   );

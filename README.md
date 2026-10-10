@@ -1,6 +1,6 @@
 # JARVIS — personal assistant for macOS
 
-Milestone 1 is a local React + TypeScript command center connected to a Python FastAPI backend. Milestones 2.1–2.2 add real conversations through OpenAI Responses or a local Ollama model. Ollama requires no API key; the default `auto` mode preserves OpenAI-with-key / mock-without-key behavior. Voice, integrations, persistent memory, and computer actions remain unavailable.
+Milestone 1 is a local React + TypeScript command center connected to a Python FastAPI backend. Milestones 2.1–2.2 add real conversations through OpenAI Responses or a local Ollama model. Ollama requires no API key; the default `auto` mode preserves OpenAI-with-key / mock-without-key behavior. Milestone 2.3 adds local push-to-talk voice using whisper.cpp and native macOS speech. Messaging integrations, persistent memory, and computer actions remain unavailable.
 
 ## Milestone 1 checklist
 
@@ -8,7 +8,7 @@ Milestone 1 is a local React + TypeScript command center connected to a Python F
 - [x] Backend health and assistant status, displayed from live API responses
 - [x] On-demand conversation window connected to the assistant endpoint
 - [x] Serbian/English selector, local UI commands, and assistant responses
-- [x] Disabled microphone control, real connection status, session command history
+- [x] Local push-to-talk microphone control, real connection status, session command history
 - [x] Environment configuration, JSON request logging, backend and frontend tests
 - [x] Modular service boundary and macOS installation instructions
 - [ ] Validate natively on macOS (cloud development host is Linux)
@@ -51,7 +51,7 @@ There is no permanent sidebar or chat window. Use the text console to summon mod
 | Jarvis, close the task list. | Jarvise, zatvori zadatke. | Close Task Manager |
 | Jarvis, close all windows. | Jarvise, zatvori sve prozore. | Restore minimal home |
 
-Known UI commands use a deterministic allowlist locally, including while the backend is offline. Unknown text uses the existing assistant endpoint; commands never execute JavaScript, shell commands, or computer actions. Serbian Cyrillic is also supported. Future speech-to-text can feed this same validated router; voice recognition is not implemented and the microphone button is disabled.
+Known UI commands use a deterministic allowlist locally, including while the backend is offline. Unknown text uses the existing assistant endpoint; commands never execute JavaScript, shell commands, or computer actions. Serbian Cyrillic is also supported. Local speech-to-text feeds this same validated router through explicit push-to-talk.
 
 Windows support focus, close, minimize/restore, multiple open modules, and desktop dragging/resizing within the visible stage. Focus the title or resize handle and use arrow keys (Shift for larger steps) as keyboard alternatives. Smaller screens stack windows below the core. Opening and closing use approximately 320 ms holographic assembly transitions. A compact top menu also summons windows, and settings provide motion and integration-preview privacy controls. Integration previews default to private; no authenticated integration data is available yet.
 
@@ -59,7 +59,7 @@ Windows support focus, close, minimize/restore, multiple open modules, and deskt
 
 Conversations retain the existing session messages, safe code rendering, timestamps, and command history until page reload. An assistant reply briefly appears above the console; open Conversations to review it afterward. Tasks, calendar, email, messages, agents, memory, tools, and workflows are honest availability views: no storage, integrations, or automation have been added.
 
-The core reflects idle, processing, responding, and error/offline states. A separate listening visual state is reserved for future integration. **Command-K** (Control-K also works) focuses the command input; **Enter** submits. Animations respect reduced-motion preferences, can be disabled in settings, and pause with health polling when the tab is hidden. The particle field is decorative geometry, not live model telemetry. Fonts are bundled locally.
+The core reflects idle, processing, responding, and error/offline states. The core also reflects listening, transcribing, and speaking during voice use. **Command-K** (Control-K also works) focuses the command input; **Enter** submits. Animations respect reduced-motion preferences, can be disabled in settings, and pause with health polling when the tab is hidden. The particle field is decorative geometry, not live model telemetry. Fonts are bundled locally.
 
 ## Run on your Mac
 
@@ -92,6 +92,95 @@ npm run dev
 ```
 
 Once the servers are running on your Mac, open `http://localhost:5173`. The backend API documentation is at `http://127.0.0.1:8000/docs`. Stop each server with Control-C. The UI checks backend health every 10 seconds; if offline, backend chat is disabled while local window commands remain available. A failed chat request is reported in the UI and command history.
+
+## Milestone 2.3: fully local push-to-talk on macOS
+
+Stop the two JARVIS servers with Control-C. Update the existing checkout:
+
+```bash
+cd ~/Downloads/Jarvis-latest
+git pull --ff-only origin main
+source .venv/bin/activate
+python -m pip install -r backend/requirements.txt
+npm ci --prefix frontend
+```
+
+Install the local speech tools. This uses the official whisper.cpp release with native Apple Silicon/Metal support, outside your application checkout:
+
+```bash
+xcode-select --install
+brew install cmake ffmpeg
+mkdir -p ~/Downloads/jarvis-voice
+git clone --depth 1 --branch v1.8.7 https://github.com/ggml-org/whisper.cpp.git ~/Downloads/jarvis-voice/whisper.cpp
+cmake -S ~/Downloads/jarvis-voice/whisper.cpp -B ~/Downloads/jarvis-voice/whisper.cpp/build -DCMAKE_BUILD_TYPE=Release
+cmake --build ~/Downloads/jarvis-voice/whisper.cpp/build --target whisper-cli -j 2
+mkdir -p "$HOME/Library/Application Support/Jarvis"
+curl --fail --location https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin \
+  --output "$HOME/Library/Application Support/Jarvis/ggml-base.bin"
+```
+
+If Command Line Tools are already installed, skip `xcode-select --install`. If the whisper.cpp directory already exists, use that existing installation rather than cloning over it. The multilingual **base** model is approximately 142 MB and recognizes Serbian and English; do not use the English-only `base.en` model. For lower memory/latency, you can explicitly download `ggml-tiny.bin` from the same official model repository and change the path, at some accuracy cost. Neither model is downloaded by JARVIS at runtime.
+
+Configure the existing backend file:
+
+```bash
+cd ~/Downloads/Jarvis-latest
+test -f backend/.env || cp backend/.env.example backend/.env
+chmod 600 backend/.env
+nano backend/.env
+```
+
+Replace corresponding entries with:
+
+```dotenv
+AI_PROVIDER=ollama
+OLLAMA_BASE_URL=http://127.0.0.1:11434
+OLLAMA_MODEL=qwen2.5:3b
+OLLAMA_TIMEOUT_SECONDS=120
+WHISPER_CPP_BIN=${HOME}/Downloads/jarvis-voice/whisper.cpp/build/bin/whisper-cli
+WHISPER_MODEL_PATH="${HOME}/Library/Application Support/Jarvis/ggml-base.bin"
+VOICE_TTS_RATE=175
+VOICE_TTS_VOICE_EN=
+VOICE_TTS_VOICE_SR=
+```
+
+Save with Control-O, Enter, Control-X. Use your already-installed `qwen2.5:3b`; verify it with `ollama list`. JARVIS does not change or download your Ollama models. Existing OpenAI configuration remains available for typed conversations, but **voice conversations are blocked unless Ollama is selected**. Voice never silently contacts a paid provider.
+
+Check installed macOS voices:
+
+```bash
+say -v '?'
+```
+
+Empty voice settings select an installed voice matching `en` or `sr`. To choose one explicitly, set `VOICE_TTS_VOICE_EN` or `VOICE_TTS_VOICE_SR` to its exact name from this list. Speed accepts 80–300 words per minute. If no Serbian voice exists, JARVIS shows an explicit error and keeps the final answer as text. It does not silently substitute English. You may explicitly choose another installed voice for Serbian; the UI warns if its language differs. Available downloadable voices are managed in macOS System Settings → Accessibility → Spoken Content (or Read & Speak, depending on macOS version); Serbian availability depends on macOS. Voice installation is a separate explicit user action.
+
+Start Ollama and the backend:
+
+```bash
+open -a Ollama
+ollama list
+cd ~/Downloads/Jarvis-latest
+source .venv/bin/activate
+unset AI_PROVIDER OLLAMA_BASE_URL OLLAMA_MODEL OLLAMA_TIMEOUT_SECONDS
+unset WHISPER_CPP_BIN WHISPER_MODEL_PATH VOICE_TTS_RATE VOICE_TTS_VOICE_EN VOICE_TTS_VOICE_SR
+cd backend
+python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
+```
+
+In a second terminal:
+
+```bash
+cd ~/Downloads/Jarvis-latest/frontend
+npm run dev -- --host 127.0.0.1
+```
+
+Open `http://localhost:5173` on your Mac. Select Serbian or English, click **Talk to JARVIS**, and grant microphone permission. Click the button again to stop and transcribe (maximum 30 seconds). The transcription appears above the console, then follows the existing command/chat pipeline. A final conversational answer is synthesized locally and played in the browser. **Cancel** stops recording, local audio processes, pending voice inference, or playback. If the browser blocks automatic audio, click **Play reply** to authorize playback; the final answer also stays visible.
+
+For denied permissions, use the browser’s site microphone settings and macOS System Settings → Privacy & Security → Microphone to allow your browser. No microphone permission is required for Python; the browser records only after your click. Localhost is required: LAN IPs, public previews, and external API base URLs cannot be used for voice. Frontend and backend startup now bind to loopback; do not publish or forward their ports or Ollama’s port 11434.
+
+Recordings are capped at 8 MB / 30 seconds, converted locally with ffmpeg to 16 kHz mono PCM, and transcribed by a four-thread whisper.cpp subprocess with a 90-second timeout. Audio/transcript intermediary files use private temporary directories and are deleted after success, cancellation, or failure. Whisper exits before Ollama inference starts; speech synthesis starts after the final answer. Synthesized audio is temporary as well. Recordings are not persisted, uploaded to external services, or logged. Session transcriptions remain in browser memory like typed chat and clear on reload. This is click-to-start / click-to-stop push-to-talk, without a wake word or automatic recording.
+
+Validation uses mocked browser capture/playback, native-tool outputs, and Ollama/OpenAI responses. Linux cannot validate real Mac microphone permissions, Apple Silicon/Metal speed, installed macOS voices, or native `say` audio. The development host’s Hugging Face requests returned HTTP 403, preventing a real Whisper model download/transcription smoke test; this does not substitute for successful recognition testing on your Mac. CLI build/flag checks and all automated tests are reported separately from native end-to-end validation.
 
 ## Milestone 2.2: local Ollama on your Mac
 
@@ -167,7 +256,7 @@ Provider choices in `backend/.env`:
 
 Changing providers/models requires a backend restart; reload the browser to start a fresh conversation context. Health checks do not run inference. Ollama status checks query only local installed-model metadata, distinguish readiness from a successful conversation, and do not download anything.
 
-Validation: **49 backend tests**, **41 frontend tests**, TypeScript checks, and production build passed. Ollama tests mock its native HTTP responses, including English/Serbian instructions, bounded context, thinking separation, cloud-model rejection, no-key operation, failure recovery, timeouts, and provider isolation. All existing OpenAI and UI tests also pass. Actual M2 inference and native Safari must be verified on your Mac; this cloud container cannot reach your Mac’s loopback Ollama service.
+Validation: **59 backend tests**, **49 frontend tests**, TypeScript checks, and production build passed. Ollama tests mock its native HTTP responses, including English/Serbian instructions, bounded context, thinking separation, cloud-model rejection, no-key operation, failure recovery, timeouts, and provider isolation. All existing OpenAI and UI tests also pass. Actual M2 inference and native Safari must be verified on your Mac; this cloud container cannot reach your Mac’s loopback Ollama service.
 
 ## Milestone 2.1: configure real AI on macOS
 
@@ -233,7 +322,7 @@ export JARVIS_LOG_LEVEL=INFO
 export JARVIS_ALLOWED_ORIGINS='http://localhost:5173,http://127.0.0.1:5173'
 ```
 
-JSON backend logs go to stderr and include request method, path, status, and duration. They exclude chat bodies. CORS permits the configured local frontend origins. The backend binds to loopback. Vite listens on 0.0.0.0:5173 and proxies /api to the backend, so remote previews need only frontend port 5173. This is a development foundation, not a public deployment with authentication. Avoid exposing it on untrusted networks.
+JSON backend logs go to stderr and include request method, path, status, and duration. They exclude chat bodies. CORS permits the configured local frontend origins. The backend binds to loopback. Vite listens on 127.0.0.1:5173 and proxies /api to the backend, so remote previews need only frontend port 5173. This is a development foundation, not a public deployment with authentication. Avoid exposing it on untrusted networks.
 
 ## Verification
 
@@ -250,10 +339,10 @@ curl --fail http://127.0.0.1:8000/api/chat \
   -d '{"message":"Zdravo","language":"sr"}'
 ```
 
-The API requests require the backend to be running. Test installation with `npm ci`, which uses the committed lockfile. Chat and command history live only in browser state and clear on reload. Telemetry describes application capabilities and session events, not Mac CPU or memory usage. Voice, persistent memory, and approved automation belong to later milestones.
+The API requests require the backend to be running. Test installation with `npm ci`, which uses the committed lockfile. Chat and command history live only in browser state and clear on reload. Telemetry describes application capabilities and session events, not Mac CPU or memory usage. Persistent memory and approved automation belong to later milestones.
 
 ### Redesign validation
 
 Frontend tests cover Ollama model/provider status and the minimal default layout, hidden modules, English/Serbian command routing, window state and keyboard controls, retained chat/history, language, offline and failure behavior, request states, manual recovery, motion controls, and safe code rendering. Backend tests also cover Responses API calls with mocked SDK/HTTP responses, language instructions, context bounds, missing-key fallback, authentication/timeouts/rate limits/network/unexpected failures, recovery, secret redaction, and usage limits. Tests isolate local credentials and never make billed API calls.
 
-Validation passed: **41 frontend tests**, **49 backend tests**, TypeScript checks, and the production build. Chromium checks at 1440×900, 1280×800, 1920×1080, 1024×768, 800×800, and 390×844 found no horizontal overflow. Browser checks exercised local commands without backend requests, real English/Serbian mock chat, window dragging/clamping, resizing, minimize/restore, close-all, mobile stacking, the local timezone clock, reduced motion, and opening windows with motion disabled. Native macOS/Safari testing remains outstanding.
+Validation passed: **49 frontend tests**, **59 backend tests**, TypeScript checks, and the production build. Chromium checks at 1440×900, 1280×800, 1920×1080, 1024×768, 800×800, and 390×844 found no horizontal overflow. Browser checks exercised local commands without backend requests, real English/Serbian mock chat, window dragging/clamping, resizing, minimize/restore, close-all, mobile stacking, the local timezone clock, reduced motion, and opening windows with motion disabled. Native macOS/Safari testing remains outstanding.

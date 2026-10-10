@@ -1,3 +1,4 @@
+import type { VoiceState } from "../hooks/useVoice";
 import { useEffect, useRef } from "react";
 import {
   AudioLines,
@@ -18,6 +19,9 @@ export default function CommandConsole({
   state,
   text,
   canSend,
+  voiceState,
+  onVoice,
+  cancelVoice,
 }: {
   draft: string;
   setDraft: (value: string) => void;
@@ -27,6 +31,9 @@ export default function CommandConsole({
   state: CoreState;
   text: Copy;
   canSend: boolean;
+  voiceState: VoiceState;
+  onVoice: () => void;
+  cancelVoice: () => void;
 }) {
   const input = useRef<HTMLInputElement>(null);
   useEffect(() => {
@@ -56,7 +63,8 @@ export default function CommandConsole({
         </span>
       </div>
       <span id="voice-unavailable" className="sr-only">
-        {text.voice}
+        Click to record; click again to stop and transcribe. Audio remains
+        local.
       </span>
       <form
         onSubmit={(event) => {
@@ -68,9 +76,13 @@ export default function CommandConsole({
         <button
           className="talk-control"
           type="button"
-          aria-label="Microphone — coming soon"
-          disabled
-          title={text.voice}
+          aria-label={
+            voiceState === "listening" ? "Stop recording" : "Start recording"
+          }
+          disabled={sending && voiceState !== "listening"}
+          onClick={onVoice}
+          aria-pressed={voiceState === "listening"}
+          title="Local push-to-talk: click to start, click to stop"
           aria-describedby="voice-unavailable"
         >
           <span className="talk-icon">
@@ -78,9 +90,21 @@ export default function CommandConsole({
           </span>
           <span>
             <strong>{text.talk}</strong>
-            <small>{text.voiceSoon}</small>
+            <small aria-live="polite">
+              {voiceState === "idle" ? "Local push-to-talk" : voiceState}
+            </small>
           </span>
         </button>
+        {!["idle", "error"].includes(voiceState) && (
+          <button
+            type="button"
+            className="subtle-control"
+            onClick={cancelVoice}
+            aria-label="Cancel voice"
+          >
+            Cancel
+          </button>
+        )}
         <div className="command-input-group">
           <span className="command-prompt">›</span>
           <input
