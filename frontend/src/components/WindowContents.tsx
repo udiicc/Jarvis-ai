@@ -111,7 +111,7 @@ export default function WindowContents({
         </div>
         <p className="window-footnote">
           <ShieldCheck size={13} />
-          No API keys or computer actions.
+          Backend-only credentials. No computer actions.
         </p>
       </div>
     );
@@ -120,7 +120,7 @@ export default function WindowContents({
       <div className="command-guide">
         <p>
           Known commands control these windows locally. Other text goes to the
-          mock assistant.
+          assistant.
         </p>
         <dl>
           <dt>Open a window</dt>

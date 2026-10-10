@@ -22,6 +22,8 @@ export function useJarvis(language: Language, visible: boolean) {
   const [sending, setSending] = useState(false);
   const [responding, setResponding] = useState(false);
   const [error, setError] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const context = useRef<import("../api").ContextMessage[]>([]);
   const [checking, setChecking] = useState(false);
   const [lastChecked, setLastChecked] = useState<string | null>(null);
   const [startedAt] = useState(() => new Date().toISOString());
@@ -99,6 +101,7 @@ export function useJarvis(language: Language, visible: boolean) {
     if (responseTimer.current) clearTimeout(responseTimer.current);
     setSending(true);
     setError(false);
+    setErrorMessage(null);
     setResponding(false);
     const messageId = ++id.current;
     const timestamp = new Date().toISOString();
@@ -114,7 +117,12 @@ export function useJarvis(language: Language, visible: boolean) {
     );
     addEvent("request", "Text command submitted");
     try {
-      const response = await sendMessage(message, language);
+      const response = await sendMessage(message, language, context.current);
+      context.current = [
+        ...context.current,
+        { role: "user", content: message },
+        { role: "assistant", content: response.reply.slice(0, 8000) },
+      ].slice(-12) as import("../api").ContextMessage[];
       if (!mounted.current) return true;
       setMessages((current) => [
         ...current,
@@ -130,13 +138,21 @@ export function useJarvis(language: Language, visible: boolean) {
           item.id === messageId ? { ...item, result: "complete" } : item,
         ),
       );
-      addEvent("response", "Mock response received");
+      addEvent(
+        "response",
+        response.mode === "openai"
+          ? "OpenAI response received"
+          : "Mock response received",
+      );
+      void refresh();
       setResponding(true);
       responseTimer.current = setTimeout(() => {
         if (mounted.current) setResponding(false);
       }, 2200);
-    } catch {
+    } catch (failure) {
       if (!mounted.current) return true;
+      setErrorMessage(failure instanceof Error ? failure.message : null);
+      void refresh();
       setError(true);
       setHistory((current) =>
         current.map((item) =>
@@ -170,6 +186,7 @@ export function useJarvis(language: Language, visible: boolean) {
     events,
     sending,
     error,
+    errorMessage,
     checking,
     lastChecked,
     startedAt,

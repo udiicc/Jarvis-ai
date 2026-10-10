@@ -1,27 +1,31 @@
 import json
 import logging
+import pytest
 
 from fastapi.testclient import TestClient
 from app.main import create_app
 from app.logging_config import JsonFormatter
 
-client = TestClient(create_app())
+@pytest.fixture
+def client():
+    with TestClient(create_app()) as test_client:
+        yield test_client
 
 
-def test_health():
+def test_health(client):
     response = client.get("/api/health")
     assert response.status_code == 200
     assert response.json()["status"] == "ok"
 
 
-def test_status():
+def test_status(client):
     status = client.get("/api/assistant/status").json()
     assert status["mode"] == "mock"
     assert status["platform_target"] == "macOS"
     assert status["capabilities"] == {"chat": True, "voice": False, "memory": False, "automation": False}
 
 
-def test_mock_chat_languages():
+def test_mock_chat_languages(client):
     for language, expected in [("en", "demo mode"), ("sr", "demo režimu")]:
         response = client.post("/api/chat", json={"message": "Hello", "language": language})
         assert response.status_code == 200
@@ -29,13 +33,13 @@ def test_mock_chat_languages():
         assert response.json()["mode"] == "mock"
 
 
-def test_invalid_chat():
+def test_invalid_chat(client):
     for payload in [{"message": ""}, {"message": " "}, {"message": "x" * 2001},
                     {"message": "hello", "language": "de"}]:
         assert client.post("/api/chat", json=payload).status_code == 422
 
 
-def test_cors():
+def test_cors(client):
     response = client.options("/api/chat", headers={"Origin": "http://localhost:5173",
         "Access-Control-Request-Method": "POST", "Access-Control-Request-Headers": "content-type"})
     assert response.status_code == 200

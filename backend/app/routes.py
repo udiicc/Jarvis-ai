@@ -1,17 +1,23 @@
 from typing import Literal
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, field_validator
 
-from .assistant import MockAssistant
+from .assistant import AssistantError, ERROR_MESSAGES
 
 router = APIRouter(prefix="/api")
-assistant = MockAssistant()
+
+
+class ContextMessage(BaseModel):
+    role: Literal["user", "assistant"]
+    content: str = Field(min_length=1, max_length=8000)
 
 
 class ChatRequest(BaseModel):
     message: str = Field(min_length=1, max_length=2000)
     language: Literal["en", "sr"] = "en"
+    history: list[ContextMessage] = Field(default_factory=list, max_length=12)
 
     @field_validator("message")
     @classmethod
@@ -23,7 +29,7 @@ class ChatRequest(BaseModel):
 
 class ChatResponse(BaseModel):
     reply: str
-    mode: Literal["mock"] = "mock"
+    mode: Literal["mock", "openai"] = "mock"
 
 
 @router.get("/health")
@@ -32,14 +38,25 @@ def health():
 
 
 @router.get("/assistant/status")
-def assistant_status():
+async def assistant_status(request: Request):
+    assistant = request.app.state.assistant
     return {
-        "status": "ready", "mode": "mock", "platform_target": "macOS",
+        "status": "ready", "mode": assistant.mode, "platform_target": "macOS",
+        "provider_state": assistant.provider_state, "provider_error": assistant.error_code,
         "languages": ["en", "sr"],
         "capabilities": {"chat": True, "voice": False, "memory": False, "automation": False},
     }
 
 
 @router.post("/chat", response_model=ChatResponse)
-def chat(request: ChatRequest):
-    return ChatResponse(reply=assistant.reply(request.message, request.language))
+async def chat(payload: ChatRequest, request: Request):
+    assistant = request.app.state.assistant
+    try:
+        reply = await assistant.reply(payload.message, payload.language, payload.history)
+        return ChatResponse(reply=reply, mode=assistant.mode)
+    except AssistantError as error:
+        if error.code not in {"busy", "usage_limit"}:
+            assistant.error_code = error.code
+        return JSONResponse(status_code=error.status, content={
+            "detail": ERROR_MESSAGES[error.code][payload.language == "sr"], "code": error.code,
+        })

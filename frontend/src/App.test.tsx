@@ -96,7 +96,7 @@ describe("minimal holographic home", () => {
     await screen.findByText("Online");
     command("Hello");
     await screen.findByText("Mock reply");
-    expect(sendMessage).toHaveBeenCalledWith("Hello", "en");
+    expect(sendMessage).toHaveBeenCalledWith("Hello", "en", []);
     command("show conversations");
     const conversation = screen.getByRole("dialog", { name: "Conversations" });
     expect(within(conversation).getByText("Mock reply")).toBeInTheDocument();
@@ -119,7 +119,7 @@ describe("minimal holographic home", () => {
     ).toBeInTheDocument();
     command("Zdravo", "Pošalji poruku");
     await waitFor(() =>
-      expect(sendMessage).toHaveBeenCalledWith("Zdravo", "sr"),
+      expect(sendMessage).toHaveBeenCalledWith("Zdravo", "sr", []),
     );
     command("Jarvise, prikaži zadatke.", "Pošalji poruku");
     expect(screen.getByRole("dialog", { name: "Zadaci" })).toBeInTheDocument();
@@ -268,4 +268,75 @@ describe("motion and background lifecycle", () => {
       "active",
     );
   });
+});
+
+it("keeps successful OpenAI context across messages and local commands", async () => {
+  vi.mocked(getStatus).mockResolvedValue({
+    ...status,
+    mode: "openai",
+    provider_state: "configured",
+  });
+  vi.mocked(sendMessage).mockResolvedValue({
+    reply: "Hello Ana",
+    mode: "openai",
+  });
+  render(<App />);
+  await screen.findByText("OpenAI configured");
+  command("My name is Ana");
+  await screen.findByText("Hello Ana");
+  await waitFor(() => expect(screen.getByLabelText("Message")).toBeEnabled());
+  command("Jarvise, otvori kalendar.");
+  expect(sendMessage).toHaveBeenCalledTimes(1);
+  command("What is my name?");
+  await waitFor(() =>
+    expect(sendMessage).toHaveBeenLastCalledWith("What is my name?", "en", [
+      { role: "user", content: "My name is Ana" },
+      { role: "assistant", content: "Hello Ana" },
+    ]),
+  );
+});
+
+it("shows processing, verified and authentication states without changing the home layout", async () => {
+  vi.mocked(getStatus).mockResolvedValue({
+    ...status,
+    mode: "openai",
+    provider_state: "configured",
+  });
+  let resolve!: (value: { reply: string; mode: string }) => void;
+  vi.mocked(sendMessage).mockImplementation(
+    () =>
+      new Promise((done) => {
+        resolve = done;
+      }),
+  );
+  render(<App />);
+  await screen.findByText("OpenAI configured");
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  command("Hello");
+  expect(
+    within(screen.getByRole("region", { name: "System connection" })).getByText(
+      "Processing",
+    ),
+  ).toBeInTheDocument();
+  vi.mocked(getStatus).mockResolvedValue({
+    ...status,
+    mode: "openai",
+    provider_state: "connected",
+  });
+  await act(async () => resolve({ reply: "Hi", mode: "openai" }));
+  await screen.findByText("OpenAI verified");
+  vi.mocked(getStatus).mockResolvedValue({
+    ...status,
+    mode: "openai",
+    provider_state: "error",
+    provider_error: "authentication",
+  });
+  vi.mocked(sendMessage).mockRejectedValue(
+    new Error("OpenAI authentication failed. Check the backend API key."),
+  );
+  command("Second");
+  await screen.findByText("Authentication error");
+  expect(screen.getByRole("alert")).toHaveTextContent(
+    "OpenAI authentication failed",
+  );
 });

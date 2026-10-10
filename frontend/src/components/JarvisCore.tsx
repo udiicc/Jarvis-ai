@@ -96,9 +96,11 @@ export function NeuralParticleField() {
 export default function JarvisCore({
   state,
   focused = false,
+  mode = "mock",
 }: {
   state: CoreState;
   focused?: boolean;
+  mode?: string;
 }) {
   const id = useId().replace(/:/g, "");
   return (
@@ -284,7 +286,9 @@ export default function JarvisCore({
             COGNITIVE INTERFACE / 01
           </text>
           <text x="300" y="579" textAnchor="middle">
-            LOCAL ASSISTANT · MOCK ENGINE
+            {mode === "openai"
+              ? "PERSONAL ASSISTANT · OPENAI"
+              : "LOCAL ASSISTANT · MOCK ENGINE"}
           </text>
           <text
             x="39"

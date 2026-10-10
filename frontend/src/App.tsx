@@ -163,7 +163,7 @@ export default function App() {
         aria-label="Holographic home"
       >
         <div className="home-core-stage">
-          <JarvisCore state={session.coreState} />
+          <JarvisCore state={session.coreState} mode={session.status?.mode} />
         </div>
         <HomeHud
           session={session}
@@ -248,7 +248,7 @@ export default function App() {
         )}
         {session.error && session.connection !== "offline" && (
           <div className="minimal-error" role="alert">
-            {text.chatError}
+            {session.errorMessage || text.chatError}
           </div>
         )}
         <CommandConsole
