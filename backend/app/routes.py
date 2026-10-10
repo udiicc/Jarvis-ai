@@ -29,7 +29,7 @@ class ChatRequest(BaseModel):
 
 class ChatResponse(BaseModel):
     reply: str
-    mode: Literal["mock", "openai"] = "mock"
+    mode: Literal["mock", "openai", "ollama"] = "mock"
 
 
 @router.get("/health")
@@ -40,8 +40,10 @@ def health():
 @router.get("/assistant/status")
 async def assistant_status(request: Request):
     assistant = request.app.state.assistant
+    await assistant.refresh_provider()
     return {
         "status": "ready", "mode": assistant.mode, "platform_target": "macOS",
+        "model": assistant.settings.ollama_model if assistant.mode == "ollama" else assistant.settings.model if assistant.mode == "openai" else None,
         "provider_state": assistant.provider_state, "provider_error": assistant.error_code,
         "languages": ["en", "sr"],
         "capabilities": {"chat": True, "voice": False, "memory": False, "automation": False},

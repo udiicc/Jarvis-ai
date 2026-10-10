@@ -288,7 +288,9 @@ export default function JarvisCore({
           <text x="300" y="579" textAnchor="middle">
             {mode === "openai"
               ? "PERSONAL ASSISTANT · OPENAI"
-              : "LOCAL ASSISTANT · MOCK ENGINE"}
+              : mode === "ollama"
+                ? "LOCAL ASSISTANT · OLLAMA"
+                : "LOCAL ASSISTANT · MOCK ENGINE"}
           </text>
           <text
             x="39"

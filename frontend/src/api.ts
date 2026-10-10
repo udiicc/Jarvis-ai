@@ -4,7 +4,14 @@ export interface AssistantStatus {
   mode: string;
   platform_target: string;
   languages: string[];
-  provider_state?: "mock" | "configured" | "processing" | "connected" | "error";
+  provider_state?:
+    | "mock"
+    | "configured"
+    | "ready"
+    | "processing"
+    | "connected"
+    | "error";
+  model?: string | null;
   provider_error?: string | null;
   capabilities: {
     chat: boolean;
@@ -38,6 +45,14 @@ async function request<T>(
     // Only render the backend's allowlisted error text; never raw provider responses.
     const body = await response.json().catch(() => null);
     const codes = [
+      "missing_key",
+      "ollama_offline",
+      "ollama_model",
+      "ollama_timeout",
+      "ollama_network",
+      "ollama_provider",
+      "ollama_thinking",
+      "ollama_remote",
       "authentication",
       "timeout",
       "rate_limit",
@@ -72,5 +87,5 @@ export const sendMessage = (
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ message, language, history }),
     },
-    50000,
+    310000,
   );

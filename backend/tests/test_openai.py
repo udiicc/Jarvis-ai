@@ -135,7 +135,7 @@ def test_official_sdk_http_contract(monkeypatch):
                  "content": [{"type": "output_text", "text": "Zdravo Ana", "annotations": []}]}],
         })
     async def scenario():
-        assistant = Assistant(Settings((), "INFO"))
+        assistant = Assistant(Settings((), "INFO", provider="openai"))
         assistant.client = openai.AsyncOpenAI(api_key=SECRET, max_retries=0,
             http_client=httpx2.AsyncClient(transport=httpx2.MockTransport(handler)))
         try:

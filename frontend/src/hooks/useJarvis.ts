@@ -142,7 +142,9 @@ export function useJarvis(language: Language, visible: boolean) {
         "response",
         response.mode === "openai"
           ? "OpenAI response received"
-          : "Mock response received",
+          : response.mode === "ollama"
+            ? "Ollama response received"
+            : "Mock response received",
       );
       void refresh();
       setResponding(true);

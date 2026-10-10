@@ -66,6 +66,41 @@ export default function HomeHud({
   open: (id: WindowId) => void;
 }) {
   const sr = language === "sr";
+  const provider = session.status?.mode === "ollama" ? "Ollama" : "OpenAI";
+  const providerErrors: Record<string, string> = {
+    authentication: "Authentication error",
+    rate_limit: "Rate / quota limit",
+    timeout: "Request timeout",
+    network: "Connection error",
+    missing_key: "Key missing",
+    ollama_offline: "Ollama offline",
+    ollama_model: "Model missing",
+    ollama_timeout: "Local timeout",
+    ollama_network: "Connection error",
+    ollama_remote: "Cloud model blocked",
+    ollama_thinking: "Final answer missing",
+  };
+  const providerLabel =
+    session.status?.mode === "mock"
+      ? "Mock / local"
+      : !session.status
+        ? sr
+          ? "Nije povezan"
+          : "Not connected"
+        : session.sending || session.status.provider_state === "processing"
+          ? sr
+            ? "Obrada"
+            : "Processing"
+          : session.status.provider_state === "connected"
+            ? `${provider} verified`
+            : session.status.provider_state === "ready"
+              ? `${provider} ready`
+              : session.status.provider_state === "configured"
+                ? `${provider} configured`
+                : session.status.provider_state === "error"
+                  ? providerErrors[session.status.provider_error || ""] ||
+                    "Provider error"
+                  : "Not connected";
   return (
     <>
       <div className="hud-left">
@@ -159,42 +194,14 @@ export default function HomeHud({
           <dl>
             <div>
               <dt>Provider</dt>
-              <dd>
-                {session.status?.mode === "openai" &&
-                (session.sending ||
-                  session.status.provider_state === "processing")
-                  ? sr
-                    ? "Obrada"
-                    : "Processing"
-                  : session.status?.provider_state === "connected"
-                    ? "OpenAI verified"
-                    : session.status?.provider_state === "configured"
-                      ? "OpenAI configured"
-                      : session.status?.provider_state === "error"
-                        ? session.status.provider_error === "authentication"
-                          ? "Authentication error"
-                          : session.status.provider_error === "rate_limit"
-                            ? "Rate / quota limit"
-                            : session.status.provider_error === "timeout"
-                              ? "Request timeout"
-                              : session.status.provider_error === "network"
-                                ? "Connection error"
-                                : "Provider error"
-                        : session.status?.mode === "mock"
-                          ? "Mock / local"
-                          : sr
-                            ? "Nije povezan"
-                            : "Not connected"}
-              </dd>
+              <dd>{providerLabel}</dd>
             </div>
             <div>
               <dt>{sr ? "Režim" : "Engine"}</dt>
-              <dd>
+              <dd title={session.status?.model || undefined}>
                 {session.status?.mode === "mock"
                   ? "Mock / local"
-                  : session.status?.mode === "openai"
-                    ? "OpenAI"
-                    : "Unavailable"}
+                  : session.status?.model || "Unavailable"}
               </dd>
             </div>
             <div>

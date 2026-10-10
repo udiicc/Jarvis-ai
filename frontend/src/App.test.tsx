@@ -340,3 +340,33 @@ it("shows processing, verified and authentication states without changing the ho
     "OpenAI authentication failed",
   );
 });
+
+it("displays Ollama model availability and preserves free local commands", async () => {
+  vi.mocked(getStatus).mockResolvedValue({
+    ...status,
+    mode: "ollama",
+    model: "qwen3:4b",
+    provider_state: "ready",
+  });
+  vi.mocked(sendMessage).mockResolvedValue({
+    reply: "Zdravo Ana",
+    mode: "ollama",
+  });
+  render(<App />);
+  await screen.findByText("Ollama ready");
+  expect(screen.getByText("qwen3:4b")).toBeInTheDocument();
+  command("Jarvise, otvori kalendar.");
+  expect(sendMessage).not.toHaveBeenCalled();
+  command("Zdravo");
+  await screen.findByText("Zdravo Ana");
+  expect(sendMessage).toHaveBeenCalledWith("Zdravo", "en", []);
+  vi.mocked(getStatus).mockResolvedValue({
+    ...status,
+    mode: "ollama",
+    model: "qwen3:4b",
+    provider_state: "error",
+    provider_error: "ollama_model",
+  });
+  fireEvent.click(screen.getByLabelText("Refresh backend status"));
+  await screen.findByText("Model missing");
+});
