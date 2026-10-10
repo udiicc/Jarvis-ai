@@ -1,0 +1,316 @@
+.jarvis-core {
+  position: relative;
+  color: #00dfff;
+  aspect-ratio: 1;
+  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
+  isolation: isolate;
+  --orbit-speed: 72s;
+  --pulse-speed: 7s;
+  --core-color: #00dfff;
+  --core-glow: #009bdf25;
+  min-width: 0;
+  container-type: inline-size;
+}
+.core-svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  color: var(--core-color);
+  position: relative;
+  z-index: 1;
+}
+.core-atmosphere {
+  position: absolute;
+  inset: 13%;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    #1384cc1c 0%,
+    #009bd210 47%,
+    transparent 72%
+  );
+  box-shadow: 0 0 65px 8px var(--core-glow);
+  animation: breathing var(--pulse-speed) ease-in-out infinite;
+  pointer-events: none;
+  z-index: -1;
+}
+.orbital-ring {
+  transform-origin: 300px 300px;
+  animation: orbit var(--orbit-speed) linear infinite;
+  stroke-width: 1.8;
+  will-change: transform;
+}
+.orbit-outer {
+  stroke-width: 2.6;
+  opacity: 0.95;
+}
+.orbit-counter {
+  animation-direction: reverse;
+  animation-duration: calc(var(--orbit-speed) * 1.4);
+  opacity: 0.58;
+  stroke-width: 1;
+}
+.orbit-blocks {
+  animation-duration: calc(var(--orbit-speed) * 1.8);
+  opacity: 0.7;
+}
+.orbit-inner {
+  animation-direction: reverse;
+  animation-duration: calc(var(--orbit-speed) * 0.75);
+  opacity: 0.8;
+}
+.satellite-system {
+  animation-duration: calc(var(--orbit-speed) * 0.65);
+  opacity: 0.9;
+}
+.orbit-ecliptic {
+  animation: none;
+  opacity: 0.5;
+  stroke-width: 0.7;
+}
+.alignment-guides {
+  color: #2586b3;
+  stroke-width: 0.7;
+  opacity: 0.5;
+}
+.radial-ticks {
+  color: #00afdc;
+  opacity: 0.7;
+}
+.outer-track {
+  opacity: 0.5;
+}
+.sphere-wireframe {
+  color: #2998c7;
+  transform-origin: 300px 300px;
+  animation: orbit 160s linear infinite;
+}
+.neural-field {
+  color: #61e8ff;
+  opacity: 0.65;
+}
+.neural-particle {
+  animation: particle-breathe 9s ease-in-out infinite;
+}
+.energy-wave {
+  transform-origin: 300px 300px;
+  opacity: 0.12;
+  animation: energy-ripple 9s ease-out infinite;
+}
+.wave-two {
+  animation-delay: -4.5s;
+}
+.intelligence-sphere {
+  opacity: 0.9;
+}
+.core-svg-labels {
+  font-family: var(--mono);
+  font-size: 6px;
+  letter-spacing: 2px;
+  fill: #4894b2;
+}
+.core-identity {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  pointer-events: none;
+  z-index: 3;
+  padding-top: 3%;
+  text-align: center;
+}
+.core-id-prefix {
+  font: 6px var(--mono);
+  letter-spacing: 2px;
+  color: #55b4ce;
+  margin-bottom: 14px;
+}
+.core-identity h2 {
+  font-family: "Space Grotesk", sans-serif;
+  font-size: clamp(22px, 6.7cqw, 41px);
+  font-weight: 500;
+  letter-spacing: clamp(3px, 1.1cqw, 7px);
+  color: #d4faff;
+  line-height: 1.2;
+  text-shadow: 0 0 22px #00dfff44;
+  white-space: nowrap;
+}
+.core-id-subtitle {
+  font: clamp(4px, 1.25cqw, 7px) var(--mono);
+  letter-spacing: clamp(0.7px, 0.45cqw, 2.4px);
+  color: #58b9d3;
+  margin-top: 11px;
+  white-space: nowrap;
+}
+.core-state-label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font: clamp(5px, 1.2cqw, 7px) var(--mono);
+  letter-spacing: 1px;
+  color: #48c8d9;
+  margin-top: 20px;
+  padding: 5px 8px;
+  background: #031525cc;
+  border: 1px solid #1b829340;
+}
+.core-state-label i {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: #00e8b5;
+  box-shadow: 0 0 6px #00e8b54d;
+}
+.core-waveform {
+  opacity: 0.3;
+}
+.core-waveform line {
+  transform-origin: center;
+  transform-box: fill-box;
+}
+.jarvis-core[data-state="processing"] {
+  --orbit-speed: 12s;
+  --pulse-speed: 1.8s;
+  --core-glow: #00b4ee3d;
+}
+.jarvis-core[data-state="processing"] .core-state-label {
+  color: #75f2ff;
+}
+.jarvis-core[data-state="processing"] .core-state-label i {
+  background: #40f3ff;
+  animation: breathing 1s ease-in-out infinite;
+}
+.jarvis-core[data-state="processing"] .energy-wave {
+  animation-duration: 2s;
+  opacity: 0.6;
+}
+.jarvis-core[data-state="responding"] {
+  --orbit-speed: 30s;
+  --pulse-speed: 2s;
+  --core-glow: #00b1ee35;
+}
+.jarvis-core[data-state="responding"] .core-waveform {
+  opacity: 0.85;
+}
+.jarvis-core[data-state="responding"] .core-waveform line {
+  animation: waveform 0.8s ease-in-out infinite;
+}
+.jarvis-core[data-state="error"],
+.jarvis-core[data-state="offline"] {
+  --core-color: #cc537d;
+  --core-glow: #ff547011;
+  --orbit-speed: 130s;
+}
+.jarvis-core[data-state="error"] .core-state-label,
+.jarvis-core[data-state="offline"] .core-state-label {
+  color: #ff9bad;
+  border-color: #ff547040;
+  background: #25152a;
+}
+.jarvis-core[data-state="error"] .core-state-label i,
+.jarvis-core[data-state="offline"] .core-state-label i {
+  background: #ff5470;
+  box-shadow: none;
+}
+.jarvis-core[data-state="offline"] .core-svg {
+  opacity: 0.55;
+}
+.jarvis-core[data-state="offline"] .neural-field {
+  opacity: 0.3;
+}
+.jarvis-core[data-state="connecting"] {
+  --orbit-speed: 100s;
+}
+.jarvis-core[data-state="connecting"] .core-state-label {
+  color: #ffc857;
+}
+.jarvis-core[data-state="connecting"] .core-state-label i {
+  background: #ffc857;
+}
+.jarvis-core[data-state="listening"] {
+  --orbit-speed: 35s;
+  --pulse-speed: 2s;
+}
+.jarvis-core[data-state="listening"] .core-waveform {
+  opacity: 0.8;
+}
+.jarvis-core[data-state="listening"] .core-waveform line {
+  animation: waveform 0.9s ease-in-out infinite;
+}
+.core-focused .orbit-ecliptic {
+  opacity: 0.9;
+}
+@keyframes orbit {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes breathing {
+  0%,
+  100% {
+    opacity: 0.65;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+@keyframes particle-breathe {
+  0%,
+  100% {
+    opacity: 0.3;
+    transform: translateY(0);
+  }
+  50% {
+    opacity: 0.8;
+    transform: translateY(-2px);
+  }
+}
+@keyframes energy-ripple {
+  0% {
+    transform: scale(0.98);
+    opacity: 0.03;
+  }
+  30% {
+    opacity: 0.2;
+  }
+  100% {
+    transform: scale(1.2);
+    opacity: 0;
+  }
+}
+@keyframes waveform {
+  0%,
+  100% {
+    transform: scaleY(0.6);
+  }
+  50% {
+    transform: scaleY(2.2);
+  }
+}
+@media (max-width: 680px) {
+  .core-id-prefix {
+    font-size: 5px;
+    letter-spacing: 1.5px;
+    margin-bottom: 10px;
+  }
+  .core-id-subtitle {
+    margin-top: 9px;
+  }
+  .core-state-label {
+    margin-top: 17px;
+    font-size: 5px;
+    letter-spacing: 0.6px;
+  }
+  .jarvis-core {
+    max-width: 100%;
+  }
+  .core-atmosphere {
+    box-shadow: 0 0 35px var(--core-glow);
+  }
+}

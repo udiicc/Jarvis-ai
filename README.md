@@ -21,11 +21,34 @@ backend/
   tests/           # endpoint, validation, CORS and configuration tests
   requirements.txt
 frontend/
-  src/             # dashboard, typed API client, responsive styling, UI tests
+  src/
+    components/    # shell, SVG core, command console, conversations, telemetry
+    hooks/         # session/API state, navigation, visibility
+    styles/        # core motion and rendering styles
+    api.ts         # existing typed API client
+    copy.ts        # English/Serbian interface copy
   package-lock.json
 ```
 
 The assistant service is the future integration point for model providers. Add speech, memory, and computer automation as separate services; automation will need explicit user approval before executing actions. Milestone 1 does not expose an action execution endpoint.
+
+## Cinematic command center
+
+![JARVIS command center captured from the running application in Chromium](docs/command-center.png)
+
+The interface uses the supplied SVG reference as visual inspiration, with original SVG geometry and local fonts (Space Grotesk and JetBrains Mono). It makes no external font or model requests.
+
+- **Command center:** holographic core, compact conversation channel, and recent command history.
+- **AI core:** a larger inspection view. Segmented orbits, radial ticks, particles, the intelligence sphere, and an elliptical orbit are rendered live with SVG and CSS.
+- **Conversations:** expanded session messages with timestamps, safe fenced-code rendering, and command history. Messages survive navigation and clear on page reload.
+- **System settings:** session motion controls and a manual backend health check. The top-bar language selector controls navigation, primary chat copy, and mock response language; some technical labels remain English.
+- **Tasks, agents, memory, tools, workflows:** informative Coming Soon views. They do not run actions or enable future capabilities.
+
+The core reflects real connection/request states: connecting, idle, processing, responding after a received reply, offline, and request error. A listening visual state exists only for future integration; nothing activates it or requests microphone access. The Talk control opens an explanatory notice.
+
+Use **Command-K** (Control-K also works) to focus the command input, and **Enter** to send. Navigation supports URL hashes and browser back/forward. At smaller widths the telemetry column collapses; on phones use the menu button to open navigation, and Escape to close it. The command console remains accessible while scrolling.
+
+Animations respect `prefers-reduced-motion`, can be paused in settings, and pause automatically when the tab is hidden. Health polling also pauses in hidden tabs and resumes on return. Request timestamps and activity come from actual session events; there are no simulated CPU/RAM statistics. The neural particle field is a procedural visual, not live AI model telemetry.
 
 ## Run on your Mac
 
@@ -57,11 +80,11 @@ cd frontend
 npm run dev
 ```
 
-On your Mac, open `http://localhost:5173`. The backend API documentation is at `http://127.0.0.1:8000/docs`. Stop each server with Control-C. The UI checks backend health every 10 seconds; if offline, chat sending is disabled. A failed chat request is reported in the UI and command history.
+Once the servers are running on your Mac, open `http://localhost:5173`. The backend API documentation is at `http://127.0.0.1:8000/docs`. Stop each server with Control-C. The UI checks backend health every 10 seconds; if offline, chat sending is disabled. A failed chat request is reported in the UI and command history.
 
 ## Configuration
 
-Defaults work without any environment files. The browser uses same-origin /api requests through Vite, including Web previews. For a separately deployed backend address:
+Defaults work without any environment files. The browser uses same-origin /api requests through Vite. This also supports a forwarded frontend when the hosting platform provides forwarding; this Codex onboarding environment does not expose a public Web preview. For a separately deployed backend address:
 
 ```bash
 cp frontend/.env.example frontend/.env.local
@@ -92,4 +115,10 @@ curl --fail http://127.0.0.1:8000/api/chat \
   -d '{"message":"Zdravo","language":"sr"}'
 ```
 
-The API requests require the backend to be running. Test installation with `npm ci`, which uses the committed lockfile. Chat and command history live only in browser state and clear on reload. Status cards describe application capabilities, not Mac CPU or memory telemetry. Voice, persistent memory, real AI, and approved automation belong to later milestones.
+The API requests require the backend to be running. Test installation with `npm ci`, which uses the committed lockfile. Chat and command history live only in browser state and clear on reload. Telemetry describes application capabilities and session events, not Mac CPU or memory usage. Voice, persistent memory, real AI, and approved automation belong to later milestones.
+
+### Redesign validation
+
+Frontend tests cover the existing chat, language, offline, and failure behavior, plus module navigation, retained conversations, core request states, manual recovery, keyboard input focus, session motion controls, and safe code rendering. Backend endpoint tests are unchanged.
+
+The redesign was also checked in Chromium at 1440×900, 1280×800, 1920×1080, 1024×768, 800×800, and 390×844: no horizontal overflow; desktop core and command console remain visible. Browser checks exercised live English/Serbian API chat, module navigation, processing/responding/idle states, request errors, offline recovery, hidden-tab animation pause, and reduced motion. Native macOS/Safari testing remains outstanding.
